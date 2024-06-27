@@ -74,6 +74,12 @@ describe('test reporters', function() {
             logs: [],
             runDuration: 0,
           });
+          reporter.report('phantomjs', {
+            name: 'it logs something other than a string',
+            passed: true,
+            logs: [{text: 'ye olde texte'}],
+            runDuration: 3,
+          });
           reporter.finish();
           assert.deepEqual(stream.read().toString().split('\n'), [
             'ok 1 phantomjs - [3 ms] - it does stuff',
@@ -82,10 +88,15 @@ describe('test reporters', function() {
             '            some log',
             '    ...',
             'skip 2 phantomjs - [0 ms] - it is skipped',
+            'ok 3 phantomjs - [3 ms] - it logs something other than a string',
+            '    ---',
+            '        browser log: |',
+            '            {"text":"ye olde texte"}',
+            '    ...',
             '',
-            '1..2',
-            '# tests 2',
-            '# pass  1',
+            '1..3',
+            '# tests 3',
+            '# pass  2',
             '# skip  1',
             '# todo  0',
             '# fail  0',
@@ -615,6 +626,61 @@ describe('test reporters', function() {
         assert.equal(reporter.willDisplay({error: true}), true);
       });
     });
+
+    context('with log processor', function() {
+      beforeEach(function() {
+        config = new Config('ci', {
+          tap_log_processor: function(log) {
+            return `yee ${log.text}`; } });
+      });
+
+      it('uses log processor', function() {
+        var reporter = new TapReporter(false, stream, config);
+        reporter.report('phantomjs', {
+          name: 'it does stuff',
+          passed: true,
+          logs: ['some log'],
+          runDuration: 3,
+        });
+        reporter.report('phantomjs', {
+          name: 'it is skipped',
+          skipped: true,
+          logs: [],
+          runDuration: 0,
+        });
+        reporter.report('phantomjs', {
+          name: 'it logs something other than a string',
+          passed: true,
+          logs: [{text: 'ye olde texte'}],
+          runDuration: 3,
+        });
+        reporter.finish();
+        assert.deepEqual(stream.read().toString().split('\n'), [
+          'ok 1 phantomjs - [3 ms] - it does stuff',
+          '    ---',
+          '        browser log: |',
+          '            some log',
+          '    ...',
+          'skip 2 phantomjs - [0 ms] - it is skipped',
+          'ok 3 phantomjs - [3 ms] - it logs something other than a string',
+          '    ---',
+          '        browser log: |',
+          '            yee ye olde texte',
+          '    ...',
+          '',
+          '1..3',
+          '# tests 3',
+          '# pass  2',
+          '# skip  1',
+          '# todo  0',
+          '# fail  0',
+          '',
+          '# ok',
+          ''
+        ]);
+      });
+    });
+
   });
 
   describe('dot reporter', function() {
@@ -798,8 +864,9 @@ describe('test reporters', function() {
       });
       reporter.finish();
       var output = stream.read().toString();
+
       assert.match(output, /<testsuite name="Testem Tests" tests="1" skipped="0" todo="0" failures="0" timestamp="(.+)" time="(\d+(\.\d+)?)">/);
-      assert.match(output, /<testcase classname="phantomjs" name="it does &lt;cool> &quot;cool&quot; 'cool' stuff"/);
+      assert.match(output, /<testcase classname="phantomjs" name="it does &lt;cool&gt; &quot;cool&quot; 'cool' stuff"/);
 
       assertXmlIsValid(output);
     });
@@ -1009,7 +1076,7 @@ describe('test reporters', function() {
       reporter.finish();
       var output = stream.read().toString();
       assert.match(output, /it failed with quotes"/);
-      assert.match(output, /&lt;it> &quot;crapped&quot; out/);
+      assert.match(output, /&lt;it&gt; &quot;crapped&quot; out/);
 
       assertXmlIsValid(output);
     });
